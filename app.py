@@ -8,9 +8,14 @@ from model import EmotionModel
 
 device = torch.device("cpu")
 
-model = EmotionModel(7)
-model.load_state_dict(torch.load("model.pth", map_location=device))
-model.eval()
+@st.cache_resource
+def load_model():
+    model = EmotionModel(7)
+    model.load_state_dict(torch.load("model.pth", map_location=device))
+    model.eval()
+    return model
+
+model = load_model()
 
 class_names = ['angry','disgust','fear','happy','neutral','sad','surprise']
 
@@ -38,9 +43,17 @@ if img_file:
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
+    if len(faces) == 0:
+        st.warning("No face detected")
+
     for (x,y,w,h) in faces:
         face = img_np[y:y+h, x:x+w]
-        face = transform(Image.fromarray(face)).unsqueeze(0)
+
+        if face is None or face.size == 0:
+            continue
+
+        face = Image.fromarray(face).convert("RGB")
+        face = transform(face).unsqueeze(0)
 
         with torch.no_grad():
             output = model(face)
@@ -54,4 +67,4 @@ if img_file:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                     (0,255,0), 2)
 
-    st.image(img_np)
+    st.image(img_np, channels="RGB")
