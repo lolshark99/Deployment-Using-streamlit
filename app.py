@@ -2,7 +2,7 @@ import streamlit as st
 import torch
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from torchvision import transforms
 from model import EmotionModel
 import pandas as pd
@@ -33,21 +33,23 @@ face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-st.title("Emotion Detector")
+st.title("🎭 Emotion Detector")
+st.caption("Tip: Keep face clear and centered for best results")
 
 img_file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
 
 if img_file:
-    img = Image.open(img_file).convert("RGB")
+    img = Image.open(img_file)
+    img = ImageOps.exif_transpose(img)
+    img = img.convert("RGB")
+
     img_np = np.array(img)
 
-    
     h, w = img_np.shape[:2]
     scale = 600 / max(h, w)
     if scale < 1:
         img_np = cv2.resize(img_np, (int(w*scale), int(h*scale)))
 
-    
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
     gray = cv2.equalizeHist(gray)
 
@@ -60,7 +62,6 @@ if img_file:
 
     st.write(f"Faces detected: {len(faces)}")
 
-    
     if len(faces) == 0:
         st.warning("No face detected, using full image")
         faces = [(0, 0, img_np.shape[1], img_np.shape[0])]
@@ -91,7 +92,6 @@ if img_file:
 
     st.image(img_np, channels="RGB")
 
-    
     if all_probs is not None:
         df = pd.DataFrame({
             "Emotion": class_names,
@@ -101,7 +101,6 @@ if img_file:
         st.subheader("Emotion Confidence")
         st.bar_chart(df.set_index("Emotion"))
 
-        
         pred_emotion = class_names[np.argmax(all_probs)]
         confidence = np.max(all_probs) * 100
         st.metric("Top Emotion", pred_emotion, f"{confidence:.1f}%")
