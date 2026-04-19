@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 from model import EmotionModel
+import pandas as pd
 
 device = torch.device("cpu")
 
@@ -97,7 +98,12 @@ if img_file:
                     (0,255,0), 2)
 
     st.image(img_np, channels="RGB")
+    import pandas as pd
 
     if all_probs is not None:
-        graph = draw_distribution(all_probs, class_names)
-        st.image(graph, caption="Emotion Probabilities")
+        df = pd.DataFrame({
+            "Emotions":class_names,
+            "Probabilities":all_probs
+        })
+        st.subheader("Emotion Confidence")
+        st.bar_chart(df.set_index("Emotion"))
