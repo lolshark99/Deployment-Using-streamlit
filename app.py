@@ -7,7 +7,7 @@ from model import EmotionModel
 mean_list_train = [0.5456, 0.4975, 0.4794]
 std_list_train  = [0.1993, 0.1924, 0.1891]
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 model = EmotionModel(num_classes=7)
 model.load_state_dict(torch.load("model.pth", map_location=device))
