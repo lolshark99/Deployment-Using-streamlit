@@ -106,4 +106,4 @@ if img_file:
             "Probabilities":all_probs
         })
         st.subheader("Emotion Confidence")
-        st.bar_chart(df.set_index("Emotion"))
+        st.bar_chart(df.set_index("Emotions"))
