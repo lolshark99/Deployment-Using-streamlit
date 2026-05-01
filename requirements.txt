@@ -1,4 +1,6 @@
-streamlit
+streamlit==1.32.2
+tornado==6.3.3
+
 numpy<2
 pillow
 opencv-python-headless
@@ -8,5 +10,5 @@ pandas
 torch==2.1.2+cpu
 torchvision==0.16.2+cpu
 
-streamlit-webrtc
-av
+streamlit-webrtc==0.47.4
+av==10.0.0
