@@ -7,12 +7,16 @@ from torchvision import transforms
 from model import EmotionModel
 import pandas as pd
 
-device = torch.device("cpu")
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import av
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @st.cache_resource
 def load_model():
     model = EmotionModel(7)
     model.load_state_dict(torch.load("model.pth", map_location=device))
+    model.to(device)
     model.eval()
     return model
 
@@ -33,8 +37,36 @@ face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-st.title("🎭 Emotion Detector")
-st.caption("Tip: Keep face clear and centered for best results")
+class EmotionProcessor(VideoTransformerBase):
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")  # get current frame
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+        for (x,y,w,h) in faces:
+            face = img[y:y+h, x:x+w]
+
+            face = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+            face = Image.fromarray(face)
+            face = transform(face).unsqueeze(0).to(device)
+
+            with torch.no_grad():
+                output = model(face)
+                pred = torch.argmax(output, dim=1).item()
+
+            label = class_names[pred]
+
+            cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
+            cv2.putText(img, label, (x,y-10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                        (0,255,0), 2)
+
+        return img  # return processed frame continuously
+
+st.title("Emotion Detector")
+
+st.subheader("Image Mode")
 
 img_file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
 
@@ -45,28 +77,13 @@ if img_file:
 
     img_np = np.array(img)
 
-    h, w = img_np.shape[:2]
-    scale = 600 / max(h, w)
-    if scale < 1:
-        img_np = cv2.resize(img_np, (int(w*scale), int(h*scale)))
-
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
     gray = cv2.equalizeHist(gray)
 
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=3,
-        minSize=(40, 40)
-    )
-
-    st.write(f"Faces detected: {len(faces)}")
+    faces = face_cascade.detectMultiScale(gray, 1.1, 3)
 
     if len(faces) == 0:
-        st.warning("No face detected, using full image")
         faces = [(0, 0, img_np.shape[1], img_np.shape[0])]
-
-    all_probs = None
 
     for (x,y,w,h) in faces:
         face = img_np[y:y+h, x:x+w]
@@ -75,12 +92,11 @@ if img_file:
             continue
 
         face = Image.fromarray(face).convert("RGB")
-        face = transform(face).unsqueeze(0)
+        face = transform(face).unsqueeze(0).to(device)
 
         with torch.no_grad():
             output = model(face)
             probs = torch.softmax(output, dim=1)[0]
-            all_probs = probs.cpu().numpy()
             pred = torch.argmax(probs).item()
 
         label = f"{class_names[pred]} ({probs[pred]*100:.1f}%)"
@@ -92,15 +108,9 @@ if img_file:
 
     st.image(img_np, channels="RGB")
 
-    if all_probs is not None:
-        df = pd.DataFrame({
-            "Emotion": class_names,
-            "Confidence": all_probs
-        })
+st.subheader("Real-Time Mode")
 
-        st.subheader("Emotion Confidence")
-        st.bar_chart(df.set_index("Emotion"))
-
-        pred_emotion = class_names[np.argmax(all_probs)]
-        confidence = np.max(all_probs) * 100
-        st.metric("Top Emotion", pred_emotion, f"{confidence:.1f}%")
+webrtc_streamer(
+    key="emotion",
+    video_transformer_factory=EmotionProcessor
+)
