@@ -1,7 +1,7 @@
-Works locally as of now , trying to fix it.
+Photo part works just fine but there are some issues with the video part , trying to fix it.
 
 
-https://github.com/lolshark99/Project-Trial-first <- Visit here to see the model.
+https://github.com/lolshark99/Project-Trial-first <- Click here to see the model.
 
 
 
